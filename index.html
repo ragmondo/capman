@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Pac-Man Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            max-width: 800px;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #phaser-game {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) and (pointer: coarse) {
+            .mobile-controls {
+                display: flex;
+                gap: 10px;
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            color: #00ff00;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.1s;
+        }
+
+        .control-btn:active {
+            background: rgba(0, 255, 0, 0.3);
+        }
+
+        .control-btn.invisible {
+            visibility: hidden;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffff00;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading">Loading...</div>
+        <div id="phaser-game"></div>
+        <div class="mobile-controls">
+            <div class="control-row">
+                <button class="control-btn" data-direction="up">↑</button>
+            </div>
+            <div class="control-row">
+                <button class="control-btn" data-direction="left">←</button>
+                <button class="control-btn invisible"></button>
+                <button class="control-btn" data-direction="right">→</button>
+            </div>
+            <div class="control-row">
+                <button class="control-btn" data-direction="down">↓</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

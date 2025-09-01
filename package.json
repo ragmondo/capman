@@ -1,0 +1,14 @@
+{
+  "name": "pacman-clone",
+  "version": "1.0.0",
+  "description": "A mobile-first Pac-Man clone using Phaser.js",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080"
+  },
+  "keywords": ["game", "phaser", "pacman", "mobile", "web"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
