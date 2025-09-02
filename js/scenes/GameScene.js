@@ -551,7 +551,7 @@ export class GameScene extends Phaser.Scene {
     }
     
     findRandomHatPosition() {
-        const attempts = 50; // Prevent infinite loop
+        const attempts = 100; // More attempts for better positioning
         
         for (let i = 0; i < attempts; i++) {
             const gridX = Math.floor(Math.random() * this.maze.width);
@@ -560,13 +560,60 @@ export class GameScene extends Phaser.Scene {
             // Check if position is valid (not wall, not tennis court)
             const tileType = this.maze.getTileAt(gridX, gridY);
             if (tileType === 0 || tileType === 2 || tileType === 3) { // Empty, dot, or power pellet
-                const worldPos = this.maze.gridToWorld(gridX, gridY);
-                return worldPos;
+                
+                // Additional check: make sure position is not in tennis court area
+                if (this.maze.pongGame) {
+                    const courtBounds = this.maze.pongGame.getCourtBounds();
+                    const worldPos = this.maze.gridToWorld(gridX, gridY);
+                    if (worldPos.x >= courtBounds.x - 20 && worldPos.x <= courtBounds.x + courtBounds.width + 20 &&
+                        worldPos.y >= courtBounds.y - 20 && worldPos.y <= courtBounds.y + courtBounds.height + 20) {
+                        continue; // Skip positions too close to tennis court
+                    }
+                }
+                
+                // Basic reachability check: ensure there are walkable neighbors
+                const hasWalkableNeighbor = [
+                    {x: gridX + 1, y: gridY},
+                    {x: gridX - 1, y: gridY},
+                    {x: gridX, y: gridY + 1},
+                    {x: gridX, y: gridY - 1}
+                ].some(neighbor => {
+                    if (neighbor.x < 0 || neighbor.x >= this.maze.width || 
+                        neighbor.y < 0 || neighbor.y >= this.maze.height) {
+                        return false;
+                    }
+                    const neighborTile = this.maze.getTileAt(neighbor.x, neighbor.y);
+                    return neighborTile === 0 || neighborTile === 2 || neighborTile === 3;
+                });
+                
+                if (hasWalkableNeighbor) {
+                    const worldPos = this.maze.gridToWorld(gridX, gridY);
+                    return worldPos;
+                }
             }
         }
         
-        // Fallback to center if no position found
-        return this.maze.gridToWorld(9, 10);
+        // Fallback to safe known positions if no position found
+        const safePositions = [
+            {x: 1, y: 1},      // Top left corner
+            {x: 17, y: 1},     // Top right corner  
+            {x: 1, y: 19},     // Bottom left corner
+            {x: 17, y: 19},    // Bottom right corner
+            {x: 9, y: 15},     // Player start position
+            {x: 9, y: 3},      // Top center
+            {x: 9, y: 17}      // Bottom center
+        ];
+        
+        // Try safe positions
+        for (const pos of safePositions) {
+            const tileType = this.maze.getTileAt(pos.x, pos.y);
+            if (tileType === 0 || tileType === 2 || tileType === 3) {
+                return this.maze.gridToWorld(pos.x, pos.y);
+            }
+        }
+        
+        // Last resort fallback to player start position
+        return this.maze.gridToWorld(9, 15);
     }
     
     handleHatLanded(hat) {

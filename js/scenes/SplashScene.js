@@ -15,7 +15,7 @@ export class SplashScene extends Phaser.Scene {
 
         // Calculate scaling based on screen width
         const baseWidth = 800;
-        const scaleFactor = Math.min(1, width / baseWidth) * 0.85; // 15% smaller as requested
+        const scaleFactor = Math.min(1, width / baseWidth) * 1.0; // Back to normal size
         
         // Title
         const titleSize = Math.floor(64 * scaleFactor);
@@ -164,14 +164,37 @@ export class SplashScene extends Phaser.Scene {
             repeat: -1
         });
 
-        // Credits
+        // Credits and GitHub link
         const creditsSize = Math.floor(14 * scaleFactor);
-        const creditsText = this.add.text(centerX, height - 30, 'Built with Phaser.js', {
+        const creditsText = this.add.text(centerX, height - 50, 'Built with Phaser.js', {
             fontSize: `${creditsSize}px`,
             fontFamily: 'Courier New',
             color: '#666666'
         });
         creditsText.setOrigin(0.5);
+        
+        // GitHub link
+        const githubSize = Math.floor(16 * scaleFactor);
+        const githubText = this.add.text(centerX, height - 25, '🔗 View Source on GitHub', {
+            fontSize: `${githubSize}px`,
+            fontFamily: 'Courier New',
+            color: '#00aaff'
+        });
+        githubText.setOrigin(0.5);
+        
+        // Make GitHub text interactive
+        githubText.setInteractive({ useHandCursor: true });
+        githubText.on('pointerover', () => {
+            githubText.setColor('#ffffff');
+            githubText.setScale(1.1);
+        });
+        githubText.on('pointerout', () => {
+            githubText.setColor('#00aaff');
+            githubText.setScale(1.0);
+        });
+        githubText.on('pointerdown', () => {
+            window.open('https://github.com/ragmondo/capman', '_blank');
+        });
 
         // Setup input handlers
         this.setupInputHandlers();

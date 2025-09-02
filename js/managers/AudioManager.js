@@ -19,8 +19,6 @@ export class AudioManager {
 
     create() {
         // This will be populated when actual audio files are added
-        // For now, we'll just log audio events for hooking purposes
-        console.log("AudioManager initialized - ready for sound files");
         
         // Resume audio context on user interaction (required by some browsers, especially mobile)
         if (this.audioContext && this.audioContext.state === 'suspended') {
@@ -28,7 +26,7 @@ export class AudioManager {
             const resumeAudio = () => {
                 if (this.audioContext && this.audioContext.state === 'suspended') {
                     this.audioContext.resume().then(() => {
-                        console.log("Audio context resumed");
+                        // Audio context resumed
                     }).catch(err => {
                         console.warn("Failed to resume audio context:", err);
                     });

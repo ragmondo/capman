@@ -14,7 +14,7 @@ class Game {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GameConfig.MAZE_COLS * GameConfig.TILE_SIZE,
-                height: (GameConfig.MAZE_ROWS * GameConfig.TILE_SIZE) + GameConfig.UI.SCORE_BAR_HEIGHT + GameConfig.UI.DEBUG_PANEL_HEIGHT
+                height: (GameConfig.MAZE_ROWS * GameConfig.TILE_SIZE) + GameConfig.UI.SCORE_BAR_HEIGHT // Debug panel space removed
             },
             physics: {
                 default: 'arcade',

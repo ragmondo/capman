@@ -133,6 +133,9 @@ export class DebugPanel {
             this.toggleVisibility();
         });
         
+        // Initialize visibility state
+        this.setVisibility(this.visible);
+        
         return this;
     }
 
@@ -198,8 +201,8 @@ export class DebugPanel {
         }
     }
 
-    toggleVisibility() {
-        this.visible = !this.visible;
+    setVisibility(visible) {
+        this.visible = visible;
         const alpha = this.visible ? 1 : 0;
         
         Object.values(this.elements).forEach(element => {
@@ -208,7 +211,14 @@ export class DebugPanel {
             }
         });
         
-        // Keep toggle hint visible
+        // Keep toggle hint visible at reduced opacity when debug is hidden
+        if (this.elements.toggleHint) {
+            this.elements.toggleHint.setAlpha(this.visible ? 1 : 0.3);
+        }
+    }
+
+    toggleVisibility() {
+        this.setVisibility(!this.visible);
         this.elements.toggleHint.setAlpha(1);
     }
 
