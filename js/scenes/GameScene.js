@@ -457,6 +457,9 @@ export class GameScene extends Phaser.Scene {
         // Reset dying flag to allow future collision detection
         this.isPlayerDying = false;
         
+        // Stop any playing siren
+        this.audioManager.stopSiren();
+        
         // Unfreeze all NPCs after reset
         this.unfreezeAllNPCs();
         
@@ -602,10 +605,23 @@ export class GameScene extends Phaser.Scene {
         this.uiManager.updateScore(points);
         this.uiManager.showMessage(`HAT STOLEN! +${points}`, 1500);
         
-        // If player stole from child, spawn security guard
+        // If player stole from child, spawn security guard and start siren
         if (newOwner === this.player && previousOwner instanceof ChildNPC) {
             this.audioManager.playWarning();
             this.spawnSecurityGuard();
+            // Start the police siren
+            this.audioManager.playSiren();
+        }
+        
+        // If a child steals from player, stop the siren (player no longer has stolen goods)
+        if (previousOwner === this.player && newOwner instanceof ChildNPC) {
+            this.audioManager.stopSiren();
+            // Also deactivate security guards since player no longer has stolen hat
+            this.securityGuards.forEach(guard => {
+                if (guard.isActive) {
+                    guard.deactivate();
+                }
+            });
         }
     }
     
@@ -843,12 +859,15 @@ export class GameScene extends Phaser.Scene {
         this.activeHat.destroy();
         this.activeHat = null;
         
-        // Deactivate all security guards if active
+        // Deactivate all security guards if active and stop siren
         this.securityGuards.forEach(guard => {
             if (guard.isActive) {
                 guard.deactivate();
             }
         });
+        
+        // Stop the siren since hat is delivered
+        this.audioManager.stopSiren();
         
         // Show success message
         this.uiManager.showMessage(`HAT DELIVERED! +${deliveryBonus}`, 2000);
@@ -1064,6 +1083,9 @@ export class GameScene extends Phaser.Scene {
         // Set dying flag to prevent multiple deaths
         this.isPlayerDying = true;
         
+        // Stop the siren when caught
+        this.audioManager.stopSiren();
+        
         this.audioManager.playError();
         // Death riff will play automatically with playPlayerDeath()
         this.audioManager.playPlayerDeath();
@@ -1135,6 +1157,9 @@ export class GameScene extends Phaser.Scene {
     playerKilledByDownvote(downvoteNPC) {
         // Set dying flag to prevent multiple deaths
         this.isPlayerDying = true;
+        
+        // Stop the siren if playing
+        this.audioManager.stopSiren();
         
         // Play specific audio based on which downvote NPC killed player
         if (downvoteNPC.name === 'yelp_downvote') {

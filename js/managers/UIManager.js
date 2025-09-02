@@ -100,7 +100,7 @@ export class UIManager {
     createLevelText(width, barHeight, fontSize) {
         this.elements.levelText = this.scene.add.text(
             width / 2,
-            barHeight / 2,
+            barHeight / 3, // Move up to give space for lives
             `LEVEL ${this.level}`,
             {
                 fontSize: `${fontSize}px`,
@@ -114,8 +114,8 @@ export class UIManager {
 
     createLivesDisplay(width, barHeight, padding) {
         this.elements.livesContainer = this.scene.add.container(
-            padding + 150,
-            barHeight / 2
+            width / 2, // Center horizontally like level text
+            (barHeight / 3) * 2 + 5 // Position below level text
         );
         this.elements.livesContainer.setDepth(102);
         
@@ -149,8 +149,12 @@ export class UIManager {
     updateLivesDisplay() {
         this.elements.livesContainer.removeAll(true);
         
+        // Center the lives display
+        const totalWidth = (this.lives - 1) * 20;
+        const startX = -totalWidth / 2;
+        
         for (let i = 0; i < this.lives; i++) {
-            const life = this.scene.add.image(i * 20, 0, 'pacman');
+            const life = this.scene.add.image(startX + i * 20, 0, 'pacman');
             life.setDisplaySize(16, 16);
             this.elements.livesContainer.add(life);
         }

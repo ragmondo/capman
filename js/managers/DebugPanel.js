@@ -6,7 +6,7 @@ export class DebugPanel {
         this.elements = {};
         this.updateInterval = 100; // Update every 100ms
         this.lastUpdate = 0;
-        this.visible = true;
+        this.visible = false; // Debug disabled by default
     }
 
     create() {

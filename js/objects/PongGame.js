@@ -26,6 +26,11 @@ export class PongGame {
         this.reactionDelay = 0;
         this.maxReactionDelay = 30; // frames of delay for realism
         
+        // Sound cooldown to prevent continuous beeping
+        this.lastWallBounceTime = 0;
+        this.lastPaddleBounceTime = 0;
+        this.soundCooldown = 100; // Minimum ms between same type of sound
+        
         this.isActive = true;
     }
     
@@ -81,6 +86,14 @@ export class PongGame {
         this.ball.x += this.ballVelocityX;
         this.ball.y += this.ballVelocityY;
         
+        // Prevent ball from getting stuck with too low velocity
+        if (Math.abs(this.ballVelocityX) < 0.5) {
+            this.ballVelocityX = this.ballVelocityX > 0 ? 1 : -1;
+        }
+        if (Math.abs(this.ballVelocityY) < 0.1) {
+            this.ballVelocityY = (Math.random() - 0.5) * 0.5;
+        }
+        
         // Bounce off top and bottom walls
         if (this.ball.y <= this.courtBounds.y + 8 || 
             this.ball.y >= this.courtBounds.y + this.courtBounds.height - 8) {
@@ -88,9 +101,12 @@ export class PongGame {
             // Add slight random variation
             this.ballVelocityY += (Math.random() - 0.5) * 0.2;
             
-            // Audio hook for wall bounce
-            if (this.scene.audioManager) {
+            // Audio hook for wall bounce with cooldown
+            const currentTime = Date.now();
+            if (this.scene.audioManager && 
+                currentTime - this.lastWallBounceTime > this.soundCooldown) {
                 this.scene.audioManager.playPongBounce('wall');
+                this.lastWallBounceTime = currentTime;
             }
         }
         
@@ -168,18 +184,23 @@ export class PongGame {
     checkCollisions() {
         // Check ball collision with paddles (check each separately for different sounds)
         let paddleHit = false;
+        const currentTime = Date.now();
         
         if (this.checkBallPaddleCollision(this.ball, this.leftPaddle)) {
             paddleHit = true;
-            // Audio hook for left paddle bounce
-            if (this.scene.audioManager) {
+            // Audio hook for left paddle bounce with cooldown
+            if (this.scene.audioManager && 
+                currentTime - this.lastPaddleBounceTime > this.soundCooldown) {
                 this.scene.audioManager.playPongBounce('left');
+                this.lastPaddleBounceTime = currentTime;
             }
         } else if (this.checkBallPaddleCollision(this.ball, this.rightPaddle)) {
             paddleHit = true;
-            // Audio hook for right paddle bounce
-            if (this.scene.audioManager) {
+            // Audio hook for right paddle bounce with cooldown
+            if (this.scene.audioManager && 
+                currentTime - this.lastPaddleBounceTime > this.soundCooldown) {
                 this.scene.audioManager.playPongBounce('right');
+                this.lastPaddleBounceTime = currentTime;
             }
         }
         

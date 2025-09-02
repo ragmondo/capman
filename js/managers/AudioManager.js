@@ -22,14 +22,23 @@ export class AudioManager {
         // For now, we'll just log audio events for hooking purposes
         console.log("AudioManager initialized - ready for sound files");
         
-        // Resume audio context on user interaction (required by some browsers)
+        // Resume audio context on user interaction (required by some browsers, especially mobile)
         if (this.audioContext && this.audioContext.state === 'suspended') {
-            document.addEventListener('click', () => {
-                if (this.audioContext.state === 'suspended') {
-                    this.audioContext.resume();
-                    console.log("Audio context resumed");
+            // Listen for multiple event types to ensure mobile compatibility
+            const resumeAudio = () => {
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume().then(() => {
+                        console.log("Audio context resumed");
+                    }).catch(err => {
+                        console.warn("Failed to resume audio context:", err);
+                    });
                 }
-            }, { once: true });
+            };
+            
+            // Add multiple event listeners for better mobile support
+            ['touchstart', 'touchend', 'click', 'keydown'].forEach(event => {
+                document.addEventListener(event, resumeAudio, { once: true });
+            });
         }
         
         return this;
@@ -201,6 +210,74 @@ export class AudioManager {
 
     playSecurityGuardLeft() {
         this.playSound('security_left', 0.6);
+    }
+    
+    playSiren() {
+        if (!this.isEnabled || !this.audioContext) return;
+        
+        // Create a police siren sound effect
+        this.sirenInterval = setInterval(() => {
+            if (!this.isEnabled || !this.audioContext) {
+                this.stopSiren();
+                return;
+            }
+            
+            try {
+                // Alternate between two frequencies for siren effect
+                const frequency1 = 800;
+                const frequency2 = 600;
+                const duration = 250;
+                
+                // First tone
+                const oscillator1 = this.audioContext.createOscillator();
+                const gainNode1 = this.audioContext.createGain();
+                
+                oscillator1.connect(gainNode1);
+                gainNode1.connect(this.audioContext.destination);
+                
+                oscillator1.frequency.value = frequency1;
+                oscillator1.type = 'sawtooth'; // Sawtooth wave for more siren-like sound
+                
+                gainNode1.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode1.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
+                
+                oscillator1.start(this.audioContext.currentTime);
+                oscillator1.stop(this.audioContext.currentTime + duration / 1000);
+                
+                // Second tone after a short delay
+                setTimeout(() => {
+                    if (!this.isEnabled || !this.audioContext) return;
+                    
+                    const oscillator2 = this.audioContext.createOscillator();
+                    const gainNode2 = this.audioContext.createGain();
+                    
+                    oscillator2.connect(gainNode2);
+                    gainNode2.connect(this.audioContext.destination);
+                    
+                    oscillator2.frequency.value = frequency2;
+                    oscillator2.type = 'sawtooth';
+                    
+                    gainNode2.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode2.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
+                    
+                    oscillator2.start(this.audioContext.currentTime);
+                    oscillator2.stop(this.audioContext.currentTime + duration / 1000);
+                }, duration);
+                
+            } catch (e) {
+                console.warn("Error playing siren sound:", e);
+            }
+        }, 500); // Repeat every 500ms
+        
+        console.log("[AUDIO] Police siren started");
+    }
+    
+    stopSiren() {
+        if (this.sirenInterval) {
+            clearInterval(this.sirenInterval);
+            this.sirenInterval = null;
+            console.log("[AUDIO] Police siren stopped");
+        }
     }
 
     playDownvoteSpawn() {

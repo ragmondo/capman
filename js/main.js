@@ -1,5 +1,6 @@
 import { GameConfig } from './config/GameConfig.js';
 import { PreloadScene } from './scenes/PreloadScene.js';
+import { SplashScene } from './scenes/SplashScene.js';
 import { GameScene } from './scenes/GameScene.js';
 import { SpriteViewerScene } from './scenes/SpriteViewerScene.js';
 
@@ -23,7 +24,7 @@ class Game {
                 }
             },
             pixelArt: true,
-            scene: [PreloadScene, GameScene, SpriteViewerScene]
+            scene: [PreloadScene, SplashScene, GameScene, SpriteViewerScene]
         };
 
         this.game = new Phaser.Game(this.config);
