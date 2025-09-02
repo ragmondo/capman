@@ -121,9 +121,6 @@ export class InputController {
     }
 
     setDirection(direction) {
-        if (this.isOppositeDirection(direction, this.currentDirection)) {
-            return;
-        }
         this.nextDirection = direction;
     }
 

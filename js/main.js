@@ -1,6 +1,7 @@
 import { GameConfig } from './config/GameConfig.js';
 import { PreloadScene } from './scenes/PreloadScene.js';
 import { GameScene } from './scenes/GameScene.js';
+import { SpriteViewerScene } from './scenes/SpriteViewerScene.js';
 
 class Game {
     constructor() {
@@ -11,8 +12,8 @@ class Game {
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
-                width: GameConfig.MAZE_WIDTH * GameConfig.TILE_SIZE,
-                height: (GameConfig.MAZE_HEIGHT * GameConfig.TILE_SIZE) + GameConfig.UI.SCORE_BAR_HEIGHT
+                width: GameConfig.MAZE_COLS * GameConfig.TILE_SIZE,
+                height: (GameConfig.MAZE_ROWS * GameConfig.TILE_SIZE) + GameConfig.UI.SCORE_BAR_HEIGHT + GameConfig.UI.DEBUG_PANEL_HEIGHT
             },
             physics: {
                 default: 'arcade',
@@ -22,7 +23,7 @@ class Game {
                 }
             },
             pixelArt: true,
-            scene: [PreloadScene, GameScene]
+            scene: [PreloadScene, GameScene, SpriteViewerScene]
         };
 
         this.game = new Phaser.Game(this.config);

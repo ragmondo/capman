@@ -201,7 +201,7 @@ export class UIManager {
                 fontSize: '32px',
                 fontFamily: 'monospace',
                 color: '#ffff00',
-                backgroundColor: '#000000',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)', // Semi-transparent black
                 padding: { x: 20, y: 10 }
             }
         );
