@@ -194,6 +194,8 @@ export class PongGame {
                 this.scene.audioManager.playPongBounce('left');
                 this.lastPaddleBounceTime = currentTime;
             }
+            // Emit bounce event for game mechanics
+            this.scene.events.emit('pongBounce', 'paddle');
         } else if (this.checkBallPaddleCollision(this.ball, this.rightPaddle)) {
             paddleHit = true;
             // Audio hook for right paddle bounce with cooldown
@@ -202,6 +204,8 @@ export class PongGame {
                 this.scene.audioManager.playPongBounce('right');
                 this.lastPaddleBounceTime = currentTime;
             }
+            // Emit bounce event for game mechanics
+            this.scene.events.emit('pongBounce', 'paddle');
         }
         
         if (paddleHit) {

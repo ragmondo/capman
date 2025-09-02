@@ -12,6 +12,7 @@ import { UIManager } from '../managers/UIManager.js';
 import { InputController } from '../managers/InputController.js';
 import { DebugPanel } from '../managers/DebugPanel.js';
 import { AudioManager } from '../managers/AudioManager.js';
+import { AnalyticsManager } from '../managers/AnalyticsManager.js';
 import { GridMovement } from '../managers/GridMovement.js';
 
 export class GameScene extends Phaser.Scene {
@@ -24,9 +25,11 @@ export class GameScene extends Phaser.Scene {
         this.inputController = null;
         this.debugPanel = null;
         this.audioManager = null;
+        this.analyticsManager = new AnalyticsManager();
         this.gameState = 'playing';
         this.isPaused = false;
         this.activeHat = null;
+        this.pongHitCount = 0; // Track pong hits for first hat throw
         this.securityGuards = []; // Array of security guards
         this.wife = null; // Reference to wife NPC
         this.downvoteNPCs = []; // Track active downvote NPCs
@@ -50,6 +53,9 @@ export class GameScene extends Phaser.Scene {
     setupGame() {
         this.audioManager = new AudioManager(this).create();
         this.uiManager = new UIManager(this).create();
+        
+        // Expose audio manager globally for debugging
+        window.audioDebug = this.audioManager;
         
         this.maze = new Maze(this).create(GameConfig.UI.SCORE_BAR_HEIGHT);
         
@@ -167,7 +173,7 @@ export class GameScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-R', () => {
             if (this.gameState === 'gameOver') {
                 this.audioManager.playMenuSelect();
-                this.restartGame();
+                this.goToSplash();
             }
         });
         
@@ -202,6 +208,10 @@ export class GameScene extends Phaser.Scene {
         // Hat-related events
         this.events.on('pongScore', (data) => {
             this.handlePongScore(data);
+        });
+        
+        this.events.on('pongBounce', () => {
+            this.handlePongBounce();
         });
         
         this.events.on('hatLanded', (hat) => {
@@ -250,6 +260,9 @@ export class GameScene extends Phaser.Scene {
         this.audioManager.playLevelComplete();
         this.audioManager.fadeOutMusic(1500);
         
+        // Track level completion in analytics
+        this.analyticsManager.levelCompleted(this.currentLevel, this.uiManager.getScore(), 0); // TODO: add time tracking
+        
         this.gameState = 'levelComplete';
         this.inputController.disable();
         this.player.stop();
@@ -266,6 +279,9 @@ export class GameScene extends Phaser.Scene {
         this.currentLevel++;
         this.uiManager.updateLevel(this.currentLevel);
         this.audioManager.playSuccess();
+        
+        // Reset pong hit counter for new level
+        this.pongHitCount = 0;
         
         // Increase speed multiplier for progressive difficulty
         this.speedMultiplier += 0.15; // 15% speed increase each level
@@ -470,11 +486,32 @@ export class GameScene extends Phaser.Scene {
         this.audioManager.playGameOver();
         this.audioManager.stopMusic();
         
+        // Track game over in analytics
+        this.analyticsManager.gameOver(this.uiManager.getScore(), this.currentLevel, 0); // TODO: add time tracking
+        
         this.gameState = 'gameOver';
         this.inputController.disable();
         
         const finalScore = this.uiManager.getScore();
-        this.uiManager.showMessage(`GAME OVER\nSCORE: ${finalScore}\nPress R to restart`, 5000);
+        
+        // Detect if mobile for appropriate restart message
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+        
+        const restartMessage = isMobile ? 
+            `GAME OVER\nSCORE: ${finalScore}\nTap to continue` :
+            `GAME OVER\nSCORE: ${finalScore}\nPress R to restart`;
+            
+        this.uiManager.showMessage(restartMessage, 5000);
+        
+        // Add touch/click support for restart
+        this.gameOverTouchHandler = (pointer) => {
+            if (this.gameState === 'gameOver') {
+                this.goToSplash();
+            }
+        };
+        
+        this.input.on('pointerdown', this.gameOverTouchHandler);
     }
 
     restartGame() {
@@ -487,9 +524,35 @@ export class GameScene extends Phaser.Scene {
         this.setupGame();
         this.startGame();
     }
+    
+    cleanup() {
+        // Clean up game objects
+        if (this.maze) {
+            this.maze.destroy();
+        }
+        
+        this.npcs.forEach(npc => npc.destroy());
+        this.npcs = [];
+        
+        // Clean up active hat
+        if (this.activeHat) {
+            this.activeHat.destroy();
+            this.activeHat = null;
+        }
+        
+        // Stop audio
+        this.audioManager.stopSiren();
+        this.audioManager.stopMusic();
+        
+        // Reset UI
+        this.uiManager.reset();
+    }
 
     startGame() {
         this.audioManager.playMusic('background_music');
+        
+        // Track game start
+        this.analyticsManager.gameStarted(this.currentLevel);
         
         this.gameState = 'playing';
         this.isPaused = false;
@@ -504,6 +567,20 @@ export class GameScene extends Phaser.Scene {
             }
         });
     }
+    
+    goToSplash() {
+        // Remove game over touch handler if it exists
+        if (this.gameOverTouchHandler) {
+            this.input.off('pointerdown', this.gameOverTouchHandler);
+            this.gameOverTouchHandler = null;
+        }
+        
+        // Clean up the scene
+        this.cleanup();
+        
+        // Go back to splash screen
+        this.scene.start('SplashScene');
+    }
 
     togglePause() {
         if (this.gameState !== 'playing') return;
@@ -512,23 +589,45 @@ export class GameScene extends Phaser.Scene {
         
         if (this.isPaused) {
             this.audioManager.playPause();
+            this.analyticsManager.gamePaused(this.currentLevel, this.uiManager.getScore());
             this.physics.pause();
             this.inputController.disable();
             this.uiManager.showMessage('PAUSED', 999999);
         } else {
             this.audioManager.playUnpause();
+            this.analyticsManager.gameUnpaused(this.currentLevel, this.uiManager.getScore());
             this.physics.resume();
             this.inputController.enable();
             this.uiManager.showMessage('', 0);
         }
     }
     
+    handlePongBounce() {
+        // Only count bounces if no hat has been thrown yet
+        if (!this.activeHat && this.pongHitCount < 5) {
+            this.pongHitCount++;
+            
+            // Force hat throw on 5th hit if no score has triggered one
+            if (this.pongHitCount >= 5) {
+                console.log("[GAME] Forcing hat throw after 5 pong hits");
+                this.forceHatThrow();
+            }
+        }
+    }
+    
     handlePongScore(data) {
+        // Reset pong hit counter since we're throwing a hat
+        this.pongHitCount = 0;
+        
         // Don't spawn new hat if one is already active
         if (this.activeHat) return;
         
         this.audioManager.playPongScore();
         this.audioManager.playStadiumCheer();
+        
+        // Track pong score and hat throw in analytics
+        this.analyticsManager.pongScore(this.currentLevel, data.winner);
+        this.analyticsManager.hatThrown(this.currentLevel, this.uiManager.getScore(), 'pong_score');
         
         // Find a random empty position on the maze (avoid walls and tennis court)
         const throwPosition = this.findRandomHatPosition();
@@ -547,6 +646,39 @@ export class GameScene extends Phaser.Scene {
         this.audioManager.playHatThrown();
         
         // Show message
+        this.uiManager.showMessage('HAT THROWN! GET IT!', 2000);
+    }
+    
+    forceHatThrow() {
+        // Don't spawn new hat if one is already active
+        if (this.activeHat) return;
+        
+        this.audioManager.playPongScore();
+        
+        // Track forced hat throw in analytics
+        this.analyticsManager.hatThrown(this.currentLevel, this.uiManager.getScore(), 'forced_5_hits');
+        
+        // Find a random empty position on the maze
+        const throwPosition = this.findRandomHatPosition();
+        if (!throwPosition) return;
+        
+        // Create hat at center of tennis court
+        const courtBounds = this.maze.pongGame ? this.maze.pongGame.getCourtBounds() : null;
+        if (!courtBounds) {
+            console.warn("[GAME] No court bounds available for forced hat throw");
+            return;
+        }
+        
+        const paddleX = courtBounds.x + courtBounds.width / 2;
+        const paddleY = courtBounds.y + courtBounds.height / 2;
+        
+        // Create and throw hat
+        this.activeHat = new Hat(this, paddleX, paddleY).create(paddleX, paddleY);
+        this.activeHat.throwToPosition(throwPosition.x, throwPosition.y, 500);
+        
+        this.audioManager.playHatThrown();
+        
+        // Show regular hat thrown message (don't advertise the 5-hit mechanism)
         this.uiManager.showMessage('HAT THROWN! GET IT!', 2000);
     }
     
@@ -636,19 +768,29 @@ export class GameScene extends Phaser.Scene {
         this.audioManager.playHatCollected();
         this.uiManager.updateScore(points);
         
+        // Track hat collection in analytics
         if (collector === this.player) {
+            this.analyticsManager.hatCollected(this.currentLevel, this.uiManager.getScore(), 'ground');
             this.audioManager.playSuccess();
             this.uiManager.showMessage(`HAT COLLECTED! +${points}`, 1500);
         } else {
             this.audioManager.playWarning();
             this.uiManager.showMessage(`${collector.name.toUpperCase()} GOT THE HAT!`, 1500);
         }
+        
+        // Reset pong hit counter for next hat
+        this.pongHitCount = 0;
     }
     
     handleHatStolen(data) {
         const { newOwner, previousOwner, points } = data;
         
         this.audioManager.playHatStolen();
+        
+        // Track hat snatching in analytics
+        if (newOwner === this.player) {
+            this.analyticsManager.hatSnatched(this.currentLevel, this.uiManager.getScore(), 'child');
+        }
         this.uiManager.updateScore(points);
         this.uiManager.showMessage(`HAT STOLEN! +${points}`, 1500);
         
@@ -791,6 +933,9 @@ export class GameScene extends Phaser.Scene {
         this.audioManager.playSecurityGuardSpawn();
         this.audioManager.playWarning();
         
+        // Track security guard spawn in analytics
+        this.analyticsManager.securityGuardSpawned(this.currentLevel, this.uiManager.getScore(), 'hat_stolen');
+        
         // Choose random entry point from accessible maze edges
         const entryPoints = [
             // Left side entries (accessible corridors)
@@ -891,6 +1036,9 @@ export class GameScene extends Phaser.Scene {
         const deliveryBonus = 500;
         this.uiManager.updateScore(deliveryBonus);
         
+        // Track hat delivery in analytics
+        this.analyticsManager.hatDelivered(this.currentLevel, this.uiManager.getScore(), deliveryBonus);
+        
         // Check if hat was stolen before removing it
         const wasHatStolen = this.activeHat.wasStolen;
         
@@ -932,6 +1080,9 @@ export class GameScene extends Phaser.Scene {
     spawnDownvoteNPCs() {
         this.audioManager.playDownvoteSpawn();
         this.audioManager.playWarning();
+        
+        // Track downvote spawn in analytics (we'll track the specific types when they spawn)
+        this.analyticsManager.downvoteSpawned(this.currentLevel, this.uiManager.getScore(), 'mixed');
         
         // Count how many hat deliveries have been made to determine how many downvotes to spawn
         const currentActiveDownvotes = this.downvoteNPCs.filter(npc => npc.isActive).length;
@@ -1130,6 +1281,9 @@ export class GameScene extends Phaser.Scene {
         // Set dying flag to prevent multiple deaths
         this.isPlayerDying = true;
         
+        // Track life lost in analytics
+        this.analyticsManager.lifeLost(this.currentLevel, this.uiManager.getScore(), 'security_guard');
+        
         // Stop the siren when caught
         this.audioManager.stopSiren();
         
@@ -1204,6 +1358,10 @@ export class GameScene extends Phaser.Scene {
     playerKilledByDownvote(downvoteNPC) {
         // Set dying flag to prevent multiple deaths
         this.isPlayerDying = true;
+        
+        // Track life lost in analytics
+        const causeOfDeath = downvoteNPC.type === 'yelp' ? 'yelp_downvote' : 'google_downvote';
+        this.analyticsManager.lifeLost(this.currentLevel, this.uiManager.getScore(), causeOfDeath);
         
         // Stop the siren if playing
         this.audioManager.stopSiren();

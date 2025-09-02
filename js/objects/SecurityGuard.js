@@ -273,7 +273,7 @@ export class SecurityGuard extends NPC {
         
         if (this.isInArrestMode) {
             // Flashing red and blue effect when in arrest mode
-            const flashCycle = Math.floor(this.flashTimer / 75); // Change every 75ms (4x faster)
+            const flashCycle = Math.floor(this.flashTimer / 19); // Change every 19ms (4x faster than original 75ms)
             
             if (flashCycle % 2 === 0) {
                 // Red phase (emergency red)

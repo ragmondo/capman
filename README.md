@@ -30,7 +30,7 @@ Collect hats and deliver them to your wife while avoiding security guards and an
 ### Desktop
 - **Arrow Keys** or **WASD**: Move in any direction
 - **P**: Pause/unpause the game
-- **D**: Toggle debug panel (for developers)
+- **Z**: Toggle debug panel (for developers)
 - **H**: Spawn debug hat (for testing)
 - **V**: View sprite gallery (debug)
 

@@ -8,11 +8,22 @@ export class AudioManager {
         this.sfxVolume = 0.8;
         this.currentMusic = null;
         
-        // Initialize Web Audio Context for simple sounds
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            console.warn("Web Audio API not supported");
+        // Don't create audio context immediately on mobile Safari
+        // It must be created on user interaction
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (!isMobile) {
+            // Desktop: create audio context immediately
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log("[AUDIO] Audio context created for desktop, state:", this.audioContext.state);
+            } catch (e) {
+                console.warn("Web Audio API not supported:", e);
+                this.audioContext = null;
+            }
+        } else {
+            // Mobile: defer audio context creation until user interaction
+            console.log("[AUDIO] Mobile detected, deferring audio context creation");
             this.audioContext = null;
         }
     }
@@ -20,26 +31,71 @@ export class AudioManager {
     create() {
         // This will be populated when actual audio files are added
         
-        // Resume audio context on user interaction (required by some browsers, especially mobile)
-        if (this.audioContext && this.audioContext.state === 'suspended') {
-            // Listen for multiple event types to ensure mobile compatibility
-            const resumeAudio = () => {
-                if (this.audioContext && this.audioContext.state === 'suspended') {
-                    this.audioContext.resume().then(() => {
-                        // Audio context resumed
-                    }).catch(err => {
-                        console.warn("Failed to resume audio context:", err);
-                    });
-                }
-            };
-            
-            // Add multiple event listeners for better mobile support
-            ['touchstart', 'touchend', 'click', 'keydown'].forEach(event => {
-                document.addEventListener(event, resumeAudio, { once: true });
-            });
-        }
+        // Mobile Safari requires audio context to be created and resumed on user interaction
+        this.setupMobileAudioSupport();
         
         return this;
+    }
+    
+    setupMobileAudioSupport() {
+        const resumeAudio = () => {
+            if (!this.audioContext) {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log("[AUDIO] Audio context created on user interaction for mobile");
+                } catch (e) {
+                    console.warn("Failed to create audio context on mobile:", e);
+                    return;
+                }
+            }
+            
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume().then(() => {
+                    console.log("[AUDIO] Audio context resumed for mobile");
+                    // Play a silent sound to unlock audio on iOS
+                    this.unlockiOSAudio();
+                }).catch(err => {
+                    console.warn("Failed to resume audio context on mobile:", err);
+                });
+            } else if (this.audioContext.state === 'running') {
+                // Still play silent sound to ensure iOS audio is unlocked
+                this.unlockiOSAudio();
+            }
+        };
+        
+        // Add multiple event listeners for better mobile support
+        ['touchstart', 'touchend', 'click', 'keydown', 'pointerdown'].forEach(event => {
+            document.addEventListener(event, resumeAudio, { once: true });
+        });
+        
+        // Also add to the canvas/game area specifically
+        this.scene.input.on('pointerdown', resumeAudio, { once: true });
+    }
+    
+    unlockiOSAudio() {
+        if (!this.audioContext || this.audioContext.state !== 'running') return;
+        
+        try {
+            // Create a silent sound to unlock iOS audio
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.value = 440;
+            oscillator.type = 'sine';
+            
+            // Set volume to 0 for silent unlock
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.1);
+            
+            console.log("[AUDIO] iOS audio unlocked with silent sound");
+        } catch (e) {
+            console.warn("Failed to unlock iOS audio:", e);
+        }
     }
 
     // Music methods
@@ -83,9 +139,28 @@ export class AudioManager {
 
     // Simple beep sound generator using Web Audio API
     playBeep(frequency = 440, duration = 200, volume = 0.3, type = 'sine') {
-        if (!this.isEnabled || !this.audioContext) return;
+        if (!this.isEnabled) {
+            console.log("[AUDIO] Audio disabled, skipping beep");
+            return;
+        }
+        
+        if (!this.audioContext) {
+            console.warn("[AUDIO] No audio context, skipping beep");
+            return;
+        }
+        
+        if (this.audioContext.state === 'suspended') {
+            console.warn("[AUDIO] Audio context suspended, attempting to resume");
+            this.audioContext.resume().then(() => {
+                this.playBeep(frequency, duration, volume, type);
+            }).catch(err => {
+                console.warn("Failed to resume audio context for beep:", err);
+            });
+            return;
+        }
         
         try {
+            console.log(`[AUDIO] Playing beep: ${frequency}Hz, ${duration}ms, vol:${volume}, type:${type}`);
             const oscillator = this.audioContext.createOscillator();
             const gainNode = this.audioContext.createGain();
             
@@ -101,7 +176,7 @@ export class AudioManager {
             oscillator.start(this.audioContext.currentTime);
             oscillator.stop(this.audioContext.currentTime + duration / 1000);
         } catch (e) {
-            console.warn("Error playing beep sound:", e);
+            console.error("Error playing beep sound:", e);
         }
     }
 
@@ -211,11 +286,36 @@ export class AudioManager {
     }
     
     playSiren() {
-        if (!this.isEnabled || !this.audioContext) return;
+        if (!this.isEnabled) {
+            console.log("[AUDIO] Audio disabled, skipping siren");
+            return;
+        }
+        
+        if (!this.audioContext) {
+            console.warn("[AUDIO] No audio context, skipping siren");
+            return;
+        }
+        
+        if (this.audioContext.state === 'suspended') {
+            console.warn("[AUDIO] Audio context suspended, attempting to resume for siren");
+            this.audioContext.resume().then(() => {
+                this.playSiren();
+            }).catch(err => {
+                console.warn("Failed to resume audio context for siren:", err);
+            });
+            return;
+        }
+        
+        // Stop any existing siren
+        if (this.sirenInterval) {
+            this.stopSiren();
+        }
+        
+        console.log("[AUDIO] Starting police siren");
         
         // Create a police siren sound effect
         this.sirenInterval = setInterval(() => {
-            if (!this.isEnabled || !this.audioContext) {
+            if (!this.isEnabled || !this.audioContext || this.audioContext.state === 'suspended') {
                 this.stopSiren();
                 return;
             }
@@ -244,30 +344,32 @@ export class AudioManager {
                 
                 // Second tone after a short delay
                 setTimeout(() => {
-                    if (!this.isEnabled || !this.audioContext) return;
+                    if (!this.isEnabled || !this.audioContext || this.audioContext.state === 'suspended') return;
                     
-                    const oscillator2 = this.audioContext.createOscillator();
-                    const gainNode2 = this.audioContext.createGain();
-                    
-                    oscillator2.connect(gainNode2);
-                    gainNode2.connect(this.audioContext.destination);
-                    
-                    oscillator2.frequency.value = frequency2;
-                    oscillator2.type = 'sawtooth';
-                    
-                    gainNode2.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                    gainNode2.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
-                    
-                    oscillator2.start(this.audioContext.currentTime);
-                    oscillator2.stop(this.audioContext.currentTime + duration / 1000);
+                    try {
+                        const oscillator2 = this.audioContext.createOscillator();
+                        const gainNode2 = this.audioContext.createGain();
+                        
+                        oscillator2.connect(gainNode2);
+                        gainNode2.connect(this.audioContext.destination);
+                        
+                        oscillator2.frequency.value = frequency2;
+                        oscillator2.type = 'sawtooth';
+                        
+                        gainNode2.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                        gainNode2.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
+                        
+                        oscillator2.start(this.audioContext.currentTime);
+                        oscillator2.stop(this.audioContext.currentTime + duration / 1000);
+                    } catch (e) {
+                        console.warn("Error playing siren second tone:", e);
+                    }
                 }, duration);
                 
             } catch (e) {
                 console.warn("Error playing siren sound:", e);
             }
         }, 500); // Repeat every 500ms
-        
-        console.log("[AUDIO] Police siren started");
     }
     
     stopSiren() {
@@ -406,5 +508,80 @@ export class AudioManager {
     testSound(key) {
         console.log(`[AUDIO] Testing sound: ${key}`);
         this.playSound(key);
+    }
+    
+    // Mobile debugging methods
+    debugAudioState() {
+        console.log("=== AUDIO DEBUG INFO ===");
+        console.log("Audio enabled:", this.isEnabled);
+        console.log("Audio context exists:", !!this.audioContext);
+        if (this.audioContext) {
+            console.log("Audio context state:", this.audioContext.state);
+            console.log("Audio context sample rate:", this.audioContext.sampleRate);
+        }
+        console.log("User agent:", navigator.userAgent);
+        console.log("Touch support:", 'ontouchstart' in window);
+        console.log("========================");
+    }
+    
+    testBeepManual() {
+        console.log("[AUDIO TEST] Manual beep test starting...");
+        this.debugAudioState();
+        
+        if (!this.audioContext) {
+            console.log("[AUDIO TEST] Creating new audio context...");
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log("[AUDIO TEST] Audio context created, state:", this.audioContext.state);
+            } catch (e) {
+                console.error("[AUDIO TEST] Failed to create audio context:", e);
+                return;
+            }
+        }
+        
+        if (this.audioContext.state === 'suspended') {
+            console.log("[AUDIO TEST] Resuming suspended context...");
+            this.audioContext.resume().then(() => {
+                console.log("[AUDIO TEST] Context resumed, now playing beep");
+                this._playTestBeep();
+            }).catch(err => {
+                console.error("[AUDIO TEST] Failed to resume context:", err);
+            });
+        } else {
+            this._playTestBeep();
+        }
+    }
+    
+    _playTestBeep() {
+        try {
+            console.log("[AUDIO TEST] Playing test beep...");
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 1);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 1);
+            
+            console.log("[AUDIO TEST] Test beep should be playing now!");
+        } catch (e) {
+            console.error("[AUDIO TEST] Error playing test beep:", e);
+        }
+    }
+    
+    testSirenManual() {
+        console.log("[AUDIO TEST] Manual siren test...");
+        this.playSiren();
+        setTimeout(() => {
+            console.log("[AUDIO TEST] Stopping siren...");
+            this.stopSiren();
+        }, 3000);
     }
 }

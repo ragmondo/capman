@@ -119,17 +119,30 @@ export class DebugPanel {
         );
         this.elements.dotsRemaining.setDepth(152);
         
-        // Toggle visibility text
-        this.elements.toggleHint = this.scene.add.text(
-            width - padding - 100,
-            panelY + padding,
-            'Press D to toggle',
-            { fontSize: '10px', fontFamily, color: '#888888' }
+        // GitHub link (always visible when debug is off) - below game arena
+        const gameArenaBottom = (GameConfig.MAZE_ROWS * GameConfig.TILE_SIZE) + GameConfig.UI.SCORE_BAR_HEIGHT;
+        this.elements.githubLink = this.scene.add.text(
+            width / 2,
+            gameArenaBottom + 20,
+            '🔗 github.com/ragmondo/capman',
+            { fontSize: '10px', fontFamily, color: '#00aaff' }
         );
-        this.elements.toggleHint.setDepth(152);
+        this.elements.githubLink.setOrigin(0.5, 0); // Center horizontally, top aligned
+        this.elements.githubLink.setDepth(152);
+        this.elements.githubLink.setInteractive({ useHandCursor: true });
+        this.elements.githubLink.on('pointerover', () => {
+            this.elements.githubLink.setColor('#ffffff');
+        });
+        this.elements.githubLink.on('pointerout', () => {
+            this.elements.githubLink.setColor('#00aaff');
+        });
+        this.elements.githubLink.on('pointerdown', (event) => {
+            event.stopPropagation();
+            window.open('https://github.com/ragmondo/capman', '_blank');
+        });
         
-        // Set up keyboard listener for toggle
-        this.scene.input.keyboard.on('keydown-D', () => {
+        // Set up keyboard listener for toggle (changed to Z)
+        this.scene.input.keyboard.on('keydown-Z', () => {
             this.toggleVisibility();
         });
         
@@ -205,21 +218,21 @@ export class DebugPanel {
         this.visible = visible;
         const alpha = this.visible ? 1 : 0;
         
-        Object.values(this.elements).forEach(element => {
+        Object.entries(this.elements).forEach(([key, element]) => {
             if (element && element.setAlpha) {
-                element.setAlpha(alpha);
+                if (key === 'githubLink') {
+                    // GitHub link is visible when debug is OFF
+                    element.setAlpha(this.visible ? 0 : 1);
+                } else {
+                    // All other elements follow normal debug visibility
+                    element.setAlpha(alpha);
+                }
             }
         });
-        
-        // Keep toggle hint visible at reduced opacity when debug is hidden
-        if (this.elements.toggleHint) {
-            this.elements.toggleHint.setAlpha(this.visible ? 1 : 0.3);
-        }
     }
 
     toggleVisibility() {
         this.setVisibility(!this.visible);
-        this.elements.toggleHint.setAlpha(1);
     }
 
     destroy() {

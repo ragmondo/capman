@@ -1,10 +1,16 @@
+import { AnalyticsManager } from '../managers/AnalyticsManager.js';
+
 export class SplashScene extends Phaser.Scene {
     constructor() {
         super({ key: 'SplashScene' });
         this.hasInteracted = false;
+        this.analyticsManager = new AnalyticsManager();
     }
 
     create() {
+        // Reset interaction flag when scene is created/recreated
+        this.hasInteracted = false;
+        
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
         const centerX = width / 2;
@@ -15,11 +21,11 @@ export class SplashScene extends Phaser.Scene {
 
         // Calculate scaling based on screen width
         const baseWidth = 800;
-        const scaleFactor = Math.min(1, width / baseWidth) * 1.0; // Back to normal size
+        const scaleFactor = Math.min(1, width / baseWidth) * 2.0; // Double size for better readability
         
         // Title
         const titleSize = Math.floor(64 * scaleFactor);
-        const titleText = this.add.text(centerX, 100, 'HAT SNATCH', {
+        const titleText = this.add.text(centerX, 80, 'HAT SNATCH', {
             fontSize: `${titleSize}px`,
             fontFamily: 'Courier New',
             color: '#ffff00',
@@ -35,7 +41,7 @@ export class SplashScene extends Phaser.Scene {
 
         // Subtitle
         const subtitleSize = Math.floor(24 * scaleFactor);
-        const subtitleText = this.add.text(centerX, 160, 'A CAP MAN ADVENTURE', {
+        const subtitleText = this.add.text(centerX, 140, 'A CAP MAN ADVENTURE', {
             fontSize: `${subtitleSize}px`,
             fontFamily: 'Courier New',
             color: '#00ff00'
@@ -50,7 +56,7 @@ export class SplashScene extends Phaser.Scene {
 
         // Game objective
         const objectiveSize = Math.floor(28 * scaleFactor);
-        const objectiveTitle = this.add.text(centerX, 220, 'OBJECTIVE:', {
+        const objectiveTitle = this.add.text(centerX, 200, 'OBJECTIVE:', {
             fontSize: `${objectiveSize}px`,
             fontFamily: 'Courier New',
             color: '#ff00ff'
@@ -58,18 +64,25 @@ export class SplashScene extends Phaser.Scene {
         objectiveTitle.setOrigin(0.5);
 
         const objectiveTextSize = Math.floor(20 * scaleFactor);
-        const objectiveText = this.add.text(centerX, 260, 'Collect hats and deliver them to your wife!', {
+        const objectiveText1 = this.add.text(centerX, 240, 'Get hats by any means', {
             fontSize: `${objectiveTextSize}px`,
             fontFamily: 'Courier New',
             color: '#ffffff'
         });
-        objectiveText.setOrigin(0.5);
+        objectiveText1.setOrigin(0.5);
+        
+        const objectiveText2 = this.add.text(centerX, 270, 'Deliver to wife', {
+            fontSize: `${objectiveTextSize}px`,
+            fontFamily: 'Courier New',
+            color: '#ffffff'
+        });
+        objectiveText2.setOrigin(0.5);
 
         // Instructions
-        const instructionsY = 310;
+        const instructionsY = 300;
         const instructions = [
             { icon: '🎾', text: 'Watch the exciting Pong game!' },
-            { icon: '🧢', text: 'Catch hats thrown when players score' },
+            { icon: '🧢', text: 'Catch hats thrown by pong players' },
             { icon: '👦', text: 'Or just snatch them from children!' },
             { icon: '👰', text: 'Deliver hats to your wife' },
             { icon: '👮', text: 'Avoid security guards!' },
@@ -80,13 +93,13 @@ export class SplashScene extends Phaser.Scene {
             const y = instructionsY + (index * 32);
             
             const iconSize = Math.floor(24 * scaleFactor);
-            const icon = this.add.text(centerX - 150, y, inst.icon, {
+            const icon = this.add.text(centerX - 200, y, inst.icon, {
                 fontSize: `${iconSize}px`
             });
-            icon.setOrigin(0.5);
+            icon.setOrigin(0, 0.5);
 
             const textSize = Math.floor(18 * scaleFactor);
-            const text = this.add.text(centerX - 110, y, inst.text, {
+            const text = this.add.text(centerX - 160, y, inst.text, {
                 fontSize: `${textSize}px`,
                 fontFamily: 'Courier New',
                 color: '#ffffff'
@@ -173,28 +186,6 @@ export class SplashScene extends Phaser.Scene {
         });
         creditsText.setOrigin(0.5);
         
-        // GitHub link
-        const githubSize = Math.floor(16 * scaleFactor);
-        const githubText = this.add.text(centerX, height - 25, '🔗 View Source on GitHub', {
-            fontSize: `${githubSize}px`,
-            fontFamily: 'Courier New',
-            color: '#00aaff'
-        });
-        githubText.setOrigin(0.5);
-        
-        // Make GitHub text interactive
-        githubText.setInteractive({ useHandCursor: true });
-        githubText.on('pointerover', () => {
-            githubText.setColor('#ffffff');
-            githubText.setScale(1.1);
-        });
-        githubText.on('pointerout', () => {
-            githubText.setColor('#00aaff');
-            githubText.setScale(1.0);
-        });
-        githubText.on('pointerdown', () => {
-            window.open('https://github.com/ragmondo/capman', '_blank');
-        });
 
         // Setup input handlers
         this.setupInputHandlers();
@@ -273,6 +264,39 @@ export class SplashScene extends Phaser.Scene {
     }
 
     startGame() {
+        // Try to unlock audio on mobile before starting game
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            try {
+                // Create a temporary audio context to unlock iOS audio
+                const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = tempAudioContext.createOscillator();
+                const gainNode = tempAudioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(tempAudioContext.destination);
+                
+                oscillator.frequency.value = 440;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0, tempAudioContext.currentTime);
+                
+                oscillator.start(tempAudioContext.currentTime);
+                oscillator.stop(tempAudioContext.currentTime + 0.1);
+                
+                console.log("[SPLASH] iOS audio unlocked on game start");
+                
+                // Clean up temp context
+                setTimeout(() => {
+                    tempAudioContext.close();
+                }, 200);
+            } catch (e) {
+                console.warn("Failed to unlock iOS audio on splash:", e);
+            }
+        }
+        
+        // Track game start from splash screen
+        this.analyticsManager.gameStartedFromSplash();
+        
         // Fade out and start game
         this.cameras.main.fadeOut(500, 0, 0, 0);
         
